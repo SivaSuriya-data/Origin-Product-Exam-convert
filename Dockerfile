@@ -1,5 +1,5 @@
 # Multi-stage build for Rust WASM compilation
-FROM rust:1.70 as rust-builder
+FROM rust:1.70 AS rust-builder
 
 # Install wasm-pack
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
@@ -12,21 +12,29 @@ WORKDIR /app/rust-formatter
 RUN wasm-pack build --target web --out-dir pkg
 
 # Node.js build stage
-FROM node:18-alpine as node-builder
+FROM node:18-alpine AS node-builder
 
 WORKDIR /app
 
-# Copy the entire project structure
-COPY . .
-
-# Change to the frontend project directory
-WORKDIR /app/Get-Converted-Exams
+# Copy package files from the Get-Converted-Exams directory
+COPY Get-Converted-Exams/package*.json ./
+COPY Get-Converted-Exams/tsconfig*.json ./
+COPY Get-Converted-Exams/vite.config.js ./
 
 # Install dependencies
 RUN npm ci
 
-# Copy built WASM module from rust-builder to the correct location
-COPY --from=rust-builder /app/rust-formatter/pkg ../rust-formatter/pkg
+# Copy source code from Get-Converted-Exams
+COPY Get-Converted-Exams/src ./src
+COPY Get-Converted-Exams/public ./public
+COPY Get-Converted-Exams/index.html ./
+
+# Copy built WASM module from rust-builder
+COPY --from=rust-builder /app/rust-formatter/pkg ./rust-formatter/pkg
+
+# Copy other necessary files
+COPY scripts ./scripts
+COPY src/python_modules ./src/python_modules
 
 # Build the application
 RUN npm run build
@@ -34,8 +42,8 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 
-# Copy built application from the correct nested path
-COPY --from=node-builder /app/Get-Converted-Exams/dist /usr/share/nginx/html
+# Copy built application
+COPY --from=node-builder /app/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
