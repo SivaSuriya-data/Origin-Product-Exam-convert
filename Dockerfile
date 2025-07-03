@@ -16,21 +16,17 @@ FROM node:18-alpine as node-builder
 
 WORKDIR /app
 
-# Copy package files
-COPY package*.json ./
-COPY tsconfig*.json ./
-COPY vite.config.ts ./
+# Copy the entire project structure
+COPY . .
+
+# Change to the frontend project directory
+WORKDIR /app/Get-Converted-Exams
 
 # Install dependencies
 RUN npm ci
 
-# Copy source code
-COPY src ./src
-COPY public ./public
-COPY index.html ./
-
-# Copy built WASM module from rust-builder
-COPY --from=rust-builder /app/rust-formatter/pkg ./rust-formatter/pkg
+# Copy built WASM module from rust-builder to the correct location
+COPY --from=rust-builder /app/rust-formatter/pkg ../rust-formatter/pkg
 
 # Build the application
 RUN npm run build
@@ -38,8 +34,8 @@ RUN npm run build
 # Production stage
 FROM nginx:alpine
 
-# Copy built application
-COPY --from=node-builder /app/dist /usr/share/nginx/html
+# Copy built application from the correct nested path
+COPY --from=node-builder /app/Get-Converted-Exams/dist /usr/share/nginx/html
 
 # Copy nginx configuration
 COPY nginx.conf /etc/nginx/nginx.conf
