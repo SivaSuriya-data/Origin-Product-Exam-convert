@@ -1,11 +1,14 @@
 # Multi-stage build for Rust WASM compilation
-FROM rust:1.70 AS rust-builder
+FROM rust:1.75 AS rust-builder
 
 # Install wasm-pack
 RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
 
 WORKDIR /app
 COPY rust-formatter ./rust-formatter
+
+# Remove any existing Cargo.lock to avoid version conflicts
+RUN rm -f rust-formatter/Cargo.lock
 
 # Build Rust WASM module
 WORKDIR /app/rust-formatter
