@@ -1,0 +1,45 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: get-converted-exams
+  namespace: get-converted-exams
+  labels:
+    app: get-converted-exams
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: get-converted-exams
+  template:
+    metadata:
+      labels:
+        app: get-converted-exams
+    spec:
+      containers:
+      - name: get-converted-exams
+        image: your-dockerhub-username/get-converted-exams:latest
+        ports:
+        - containerPort: 80
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "250m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          httpGet:
+            path: /
+            port: 80
+          initialDelaySeconds: 5
+          periodSeconds: 5
+        env:
+        - name: NODE_ENV
+          value: "production"
+      imagePullPolicy: Always
