@@ -221,7 +221,7 @@ pipeline {
                             kubectl wait --for=condition=ready pod -l app=${APP_NAME} -n ${NAMESPACE} --timeout=300s
                             
                             # Get service endpoint
-                            EXTERNAL_IP=$(kubectl get ingress ${APP_NAME}-ingress -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}' 2>/dev/null || echo "Not configured")
+                            EXTERNAL_IP=$(kubectl get ingress ${APP_NAME}-ingress -n ${NAMESPACE} -o jsonpath='{.status.loadBalancer.ingress[0].hostname}\' 2>/dev/null || echo "Not configured")
                             echo "🌐 Application endpoint: ${EXTERNAL_IP}"
                             
                             # Basic health check
