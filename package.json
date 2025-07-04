@@ -9,7 +9,9 @@
     "lint": "eslint .",
     "preview": "vite preview",
     "build:wasm": "wasm-pack build --target web --out-dir pkg rust-formatter",
-    "build:python": "python scripts/build_python_wasm.py"
+    "build:python": "python scripts/build_python_wasm.py",
+    "generate-pdf": "node scripts/generate-pdf.js",
+    "docs:pdf": "npm run generate-pdf"
   },
   "dependencies": {
     "@tailwindcss/vite": "^4.1.7",
@@ -33,6 +35,8 @@
     "eslint-plugin-react-refresh": "^0.4.19",
     "globals": "^16.0.0",
     "typescript": "^5.3.3",
-    "vite": "^6.3.5"
+    "vite": "^6.3.5",
+    "puppeteer": "^21.6.1",
+    "marked": "^11.1.1"
   }
 }
