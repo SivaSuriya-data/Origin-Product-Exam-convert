@@ -10,6 +10,7 @@
     "preview": "vite preview",
     "build:wasm": "wasm-pack build --target web --out-dir pkg rust-formatter",
     "build:python": "python scripts/build_python_wasm.py",
+    "build:all": "npm run build:wasm && npm run build:python && npm run build",
     "generate-pdf": "node scripts/generate-pdf.js",
     "docs:pdf": "npm run generate-pdf"
   },
@@ -23,7 +24,8 @@
     "pyodide": "^0.24.1",
     "jszip": "^3.10.1",
     "pdf-lib": "^1.17.1",
-    "tesseract.js": "^5.0.4"
+    "tesseract.js": "^5.0.4",
+    "comlink": "^4.4.1"
   },
   "devDependencies": {
     "@eslint/js": "^9.25.0",
@@ -37,6 +39,7 @@
     "typescript": "^5.3.3",
     "vite": "^6.3.5",
     "puppeteer": "^21.6.1",
-    "marked": "^11.1.1"
+    "marked": "^11.1.1",
+    "wasm-pack": "^0.12.1"
   }
 }

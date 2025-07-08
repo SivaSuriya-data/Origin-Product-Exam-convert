@@ -6,22 +6,35 @@ import tailwindcss from "@tailwindcss/vite";
 export default defineConfig({
   plugins: [react(), tailwindcss()],
   optimizeDeps: {
-    exclude: ['pyodide']
+    exclude: ['pyodide'],
+    include: ['jszip', 'pdf-lib']
   },
   server: {
     headers: {
       'Cross-Origin-Embedder-Policy': 'require-corp',
       'Cross-Origin-Opener-Policy': 'same-origin',
     },
+    fs: {
+      allow: ['..']
+    }
   },
   build: {
     target: 'esnext',
+    assetsInlineLimit: 0,
     rollupOptions: {
       output: {
         manualChunks: {
           'pyodide': ['pyodide'],
-          'wasm': ['jszip', 'pdf-lib']
+          'wasm': ['jszip', 'pdf-lib'],
+          'vendor': ['react', 'react-dom'],
+          'ui': ['lucide-react', 'tailwindcss']
         }
+      }
+    },
+    rollupOptions: {
+      external: [],
+      output: {
+        format: 'es'
       }
     }
   }

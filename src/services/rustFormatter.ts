@@ -3,14 +3,36 @@ import { ProcessedFile, ExamConfig } from '../types';
 export class RustFormatterService {
   private wasmModule: any = null;
   private formatter: any = null;
+  private isInitialized = false;
 
   async initialize(): Promise<void> {
-    if (!this.wasmModule) {
+    if (!this.wasmModule && !this.isInitialized) {
       // Load the WASM module
-      const wasmModule = await import('../../rust-formatter/pkg');
+      try {
+        const wasmModule = await import('../../rust-formatter/pkg');
+        await wasmModule.default();
+        this.wasmModule = wasmModule;
+        this.formatter = new wasmModule.DocumentFormatter();
+        this.isInitialized = true;
+        console.log('Rust WASM module initialized successfully');
+      } catch (error) {
+        console.error('Failed to initialize Rust WASM module:', error);
+        throw new Error('Failed to load document formatter. Please refresh the page.');
+      }
+    }
+  }
+
+  async setExamConfig(examConfig: ExamConfig): Promise<void> {
+    if (!this.formatter) {
       await wasmModule.default();
-      this.wasmModule = wasmModule;
-      this.formatter = new wasmModule.DocumentFormatter();
+    }
+    
+    try {
+      this.formatter.set_config(examConfig);
+      console.log(`Exam configuration set for: ${examConfig.name}`);
+    } catch (error) {
+      console.error('Failed to set exam configuration:', error);
+      throw new Error('Failed to configure document formatter');
     }
   }
 
@@ -19,12 +41,11 @@ export class RustFormatterService {
     examConfig: ExamConfig,
     onProgress?: (progress: number) => void
   ): Promise<ProcessedFile[]> {
-    if (!this.formatter) {
+    if (!this.formatter || !this.isInitialized) {
       await this.initialize();
+      await this.setExamConfig(examConfig);
     }
 
-    // Set the configuration
-    this.formatter.set_config(examConfig);
 
     const formattedFiles: ProcessedFile[] = [];
     const total = files.length;
@@ -50,12 +71,19 @@ export class RustFormatterService {
         );
 
         // Create a new blob from the formatted data
+        const outputFormat = this.getOutputMimeType(file.detectedType, examConfig);
+        const fileExtension = this.getFileExtension(file.detectedType, examConfig);
         const formattedBlob = new Blob([formattedData], {
-          type: this.getOutputMimeType(file.detectedType, examConfig)
+          type: outputFormat
         });
 
+        // Update filename with correct extension
+        const finalName = file.newName.includes('.') 
+          ? file.newName 
+          : `${file.newName}.${fileExtension}`;
         formattedFiles.push({
           ...file,
+          newName: finalName,
           status: 'completed',
           progress: 100,
           formattedFile: formattedBlob

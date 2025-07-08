@@ -6,7 +6,6 @@ This script prepares Python modules for use with Pyodide
 
 import os
 import shutil
-import zipfile
 from pathlib import Path
 
 def create_python_package():
@@ -19,8 +18,7 @@ def create_python_package():
     # Document analyzer module
     analyzer_code = '''
 import re
-import base64
-from typing import Dict, List, Tuple, Optional
+from typing import Dict, List, Tuple, Optional, Any
 
 class DocumentAnalyzer:
     """Advanced document type detection and analysis"""
@@ -39,13 +37,16 @@ class DocumentAnalyzer:
                 r'passport.*size',
                 r'recent.*photo',
                 r'headshot',
-                r'portrait'
+                r'portrait',
+                r'image.*photo',
+                r'profile.*pic'
             ],
             'signature': [
                 r'signature|sign',
                 r'specimen.*signature',
                 r'thumb.*impression',
-                r'autograph'
+                r'autograph',
+                r'hand.*sign'
             ],
             'marksheet': [
                 r'mark.*sheet|marksheet',
@@ -54,7 +55,10 @@ class DocumentAnalyzer:
                 r'examination.*result',
                 r'board.*examination',
                 r'semester.*result',
-                r'annual.*result'
+                r'annual.*result',
+                r'class.*10|class.*12',
+                r'10th|12th|tenth|twelfth',
+                r'ssc|hsc|cbse|icse'
             ],
             'certificate': [
                 r'certificate',
@@ -64,7 +68,11 @@ class DocumentAnalyzer:
                 r'post.*graduation',
                 r'bachelor',
                 r'master',
-                r'phd|doctorate'
+                r'phd|doctorate',
+                r'b\\.?tech|m\\.?tech',
+                r'b\\.?sc|m\\.?sc',
+                r'b\\.?com|m\\.?com',
+                r'b\\.?a|m\\.?a'
             ],
             'caste_certificate': [
                 r'caste.*certificate',
@@ -72,26 +80,30 @@ class DocumentAnalyzer:
                 r'sc.*certificate|st.*certificate|obc.*certificate',
                 r'backward.*class',
                 r'reservation.*certificate',
-                r'tribal.*certificate'
+                r'tribal.*certificate',
+                r'category.*certificate'
             ],
             'income_certificate': [
                 r'income.*certificate',
                 r'annual.*income',
                 r'salary.*certificate',
                 r'earnings.*certificate',
-                r'financial.*status'
+                r'financial.*status',
+                r'family.*income'
             ],
             'domicile': [
                 r'domicile.*certificate',
                 r'residence.*certificate',
                 r'permanent.*resident',
-                r'native.*certificate'
+                r'native.*certificate',
+                r'residential.*proof'
             ],
             'migration': [
                 r'migration.*certificate',
                 r'transfer.*certificate',
                 r'tc|t\\.c\\.',
-                r'school.*leaving'
+                r'school.*leaving',
+                r'college.*leaving'
             ]
         }
         
@@ -102,6 +114,20 @@ class DocumentAnalyzer:
             'jee': ['photo', 'signature', 'class10_certificate', 'class12_certificate', 'aadhaar'],
             'cat': ['photo', 'signature', 'graduation_certificate', 'aadhaar', 'category_certificate'],
             'gate': ['photo', 'signature', 'graduation_certificate', 'aadhaar']
+        }
+        
+        # Document type priorities for better detection
+        self.type_priorities = {
+            'photo': 10,
+            'signature': 9,
+            'aadhaar': 8,
+            'marksheet': 7,
+            'certificate': 6,
+            'caste_certificate': 5,
+            'income_certificate': 4,
+            'domicile': 3,
+            'migration': 2,
+            'document': 1
         }
     
     def analyze_document_type(self, filename: str, file_content: Optional[bytes] = None) -> str:
@@ -120,26 +146,39 @@ class DocumentAnalyzer:
         # Remove common file extensions for better matching
         name_without_ext = filename_lower.rsplit('.', 1)[0]
         
-        # Check filename patterns
+        # Clean up common separators and numbers
+        cleaned_name = re.sub(r'[_\-\s]+', ' ', name_without_ext)
+        cleaned_name = re.sub(r'\d+', '', cleaned_name).strip()
+        
+        detected_types = []
+        
+        # Check filename patterns and collect all matches with priorities
         for doc_type, patterns in self.document_patterns.items():
             for pattern in patterns:
-                if re.search(pattern, name_without_ext, re.IGNORECASE):
-                    return doc_type
+                if re.search(pattern, cleaned_name, re.IGNORECASE):
+                    priority = self.type_priorities.get(doc_type, 1)
+                    detected_types.append((doc_type, priority))
+                    break
+        
+        # Return the highest priority match
+        if detected_types:
+            detected_types.sort(key=lambda x: x[1], reverse=True)
+            return detected_types[0][0]
         
         # Fallback to common naming conventions
-        if any(word in name_without_ext for word in ['photo', 'pic', 'image', 'passport', 'headshot']):
+        if any(word in cleaned_name for word in ['photo', 'pic', 'image', 'passport', 'headshot']):
             return 'photo'
-        elif any(word in name_without_ext for word in ['sign', 'signature', 'autograph']):
+        elif any(word in cleaned_name for word in ['sign', 'signature', 'autograph']):
             return 'signature'
-        elif any(word in name_without_ext for word in ['mark', 'grade', 'result', 'transcript']):
+        elif any(word in cleaned_name for word in ['mark', 'grade', 'result', 'transcript']):
             return 'marksheet'
-        elif any(word in name_without_ext for word in ['cert', 'certificate', 'diploma', 'degree']):
+        elif any(word in cleaned_name for word in ['cert', 'certificate', 'diploma', 'degree']):
             return 'certificate'
-        elif any(word in name_without_ext for word in ['aadhaar', 'aadhar', 'uid']):
+        elif any(word in cleaned_name for word in ['aadhaar', 'aadhar', 'uid']):
             return 'aadhaar'
-        elif any(word in name_without_ext for word in ['caste', 'community', 'sc', 'st', 'obc']):
+        elif any(word in cleaned_name for word in ['caste', 'community', 'sc', 'st', 'obc']):
             return 'caste_certificate'
-        elif any(word in name_without_ext for word in ['income', 'salary', 'earnings']):
+        elif any(word in cleaned_name for word in ['income', 'salary', 'earnings']):
             return 'income_certificate'
         
         return 'document'  # Default type
@@ -200,7 +239,7 @@ class DocumentAnalyzer:
         """Get list of required document types for an exam"""
         return self.exam_requirements.get(exam_code, [])
     
-    def analyze_batch(self, files_info: List[Dict], exam_code: str) -> List[Dict]:
+    def analyze_batch(self, files_info: List[Dict[str, Any]], exam_code: str) -> List[Dict[str, Any]]:
         """
         Analyze a batch of files
         
@@ -257,6 +296,7 @@ analyzer = DocumentAnalyzer()
         f.write("from .document_analyzer import DocumentAnalyzer, analyzer\n")
     
     print("Python WASM package created successfully!")
+    print(f"Package location: {package_dir.absolute()}")
 
 if __name__ == "__main__":
     create_python_package()

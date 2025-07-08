@@ -8,6 +8,7 @@ interface FileUploaderProps {
   maxFileSize: number;
   allowedFormats: string[];
   isProcessing: boolean;
+  disabled?: boolean;
 }
 
 export default function FileUploader({ 
@@ -15,13 +16,15 @@ export default function FileUploader({
   onFilesChange, 
   maxFileSize, 
   allowedFormats,
-  isProcessing 
+  isProcessing,
+  disabled = false
 }: FileUploaderProps) {
   const [isDragOver, setIsDragOver] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleDragOver = (e: React.DragEvent) => {
     e.preventDefault();
+    if (disabled) return;
     setIsDragOver(true);
   };
 
@@ -33,22 +36,34 @@ export default function FileUploader({
   const handleDrop = (e: React.DragEvent) => {
     e.preventDefault();
     setIsDragOver(false);
+    if (disabled) return;
 
     const droppedFiles = Array.from(e.dataTransfer.files);
     processFiles(droppedFiles);
   };
 
   const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    if (disabled) return;
     const selectedFiles = Array.from(e.target.files || []);
     processFiles(selectedFiles);
   };
 
   const processFiles = (newFiles: File[]) => {
+    if (disabled) return;
+    
     const validFiles = newFiles.filter((file) => {
       const maxSizeBytes = maxFileSize * 1024; // Convert KB to bytes
       return allowedFormats.includes(file.type) && file.size <= maxSizeBytes;
     });
 
+    const invalidFiles = newFiles.filter((file) => {
+      const maxSizeBytes = maxFileSize * 1024;
+      return !allowedFormats.includes(file.type) || file.size > maxSizeBytes;
+    });
+
+    if (invalidFiles.length > 0) {
+      alert(`${invalidFiles.length} files were rejected due to invalid format or size. Please check the requirements.`);
+    }
     const fileObjects: ProcessedFile[] = validFiles.map((file) => ({
       id: Math.random().toString(36).substr(2, 9),
       originalName: file.name,
@@ -63,6 +78,7 @@ export default function FileUploader({
   };
 
   const removeFile = (id: string) => {
+    if (disabled || isProcessing) return;
     onFilesChange(files.filter((file) => file.id !== id));
   };
 
@@ -115,11 +131,11 @@ export default function FileUploader({
           isDragOver
             ? "border-blue-500 bg-blue-50 scale-105"
             : "border-gray-300 hover:border-gray-400"
-        } ${isProcessing ? 'opacity-50 pointer-events-none' : ''}`}
+        } ${isProcessing || disabled ? 'opacity-50 pointer-events-none' : ''}`}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
         onDrop={handleDrop}
-        onClick={() => !isProcessing && fileInputRef.current?.click()}
+        onClick={() => !isProcessing && !disabled && fileInputRef.current?.click()}
       >
         <Upload
           className={`mx-auto mb-4 ${
@@ -128,7 +144,7 @@ export default function FileUploader({
           size={48}
         />
         <h3 className="text-lg font-semibold text-gray-700 mb-2">
-          {isProcessing ? 'Processing...' : 'Drop files here or click to browse'}
+          {isProcessing ? 'Processing...' : disabled ? 'Loading...' : 'Drop files here or click to browse'}
         </h3>
         <p className="text-gray-500 mb-4">
           Upload your documents for conversion
@@ -141,10 +157,10 @@ export default function FileUploader({
           className="hidden"
           onChange={handleFileSelect}
           accept={allowedFormats.join(',')}
-          disabled={isProcessing}
+          disabled={isProcessing || disabled}
         />
 
-        {!isProcessing && (
+        {!isProcessing && !disabled && (
           <button
             type="button"
             className="bg-blue-600 text-white px-6 py-2 rounded-lg hover:bg-blue-700 transition-colors"

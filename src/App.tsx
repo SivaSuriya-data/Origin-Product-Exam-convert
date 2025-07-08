@@ -3,6 +3,7 @@ import "./App.css";
 import ExamSelector from "./components/ExamSelector";
 import FileUploader from "./components/FileUploader";
 import ProcessingStatus from "./components/ProcessingStatus";
+import { LoadingSpinner } from "./components/LoadingSpinner";
 import { ProcessedFile, ConversionResult } from "./types";
 import { EXAM_CONFIGS } from "./config/examConfigs";
 import { DocumentAnalyzerService } from "./services/documentAnalyzer";
@@ -13,8 +14,10 @@ function App() {
   const [selectedExam, setSelectedExam] = useState("upsc");
   const [files, setFiles] = useState<ProcessedFile[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
+  const [isInitializing, setIsInitializing] = useState(false);
   const [currentStep, setCurrentStep] = useState("");
   const [zipBlob, setZipBlob] = useState<Blob | null>(null);
+  const [servicesReady, setServicesReady] = useState(false);
 
   // Services
   const [documentAnalyzer] = useState(() => new DocumentAnalyzerService());
@@ -23,20 +26,44 @@ function App() {
 
   const examConfig = EXAM_CONFIGS[selectedExam];
 
+  // Initialize services when exam changes
+  const initializeServices = useCallback(async (examCode: string) => {
+    setIsInitializing(true);
+    try {
+      // Initialize Python analyzer
+      await documentAnalyzer.initialize();
+      
+      // Initialize Rust formatter with exam config
+      await rustFormatter.initialize();
+      await rustFormatter.setExamConfig(EXAM_CONFIGS[examCode]);
+      
+      setServicesReady(true);
+    } catch (error) {
+      console.error('Failed to initialize services:', error);
+    } finally {
+      setIsInitializing(false);
+    }
+  }, [documentAnalyzer, rustFormatter]);
   const handleExamChange = useCallback((examCode: string) => {
     setSelectedExam(examCode);
     // Clear files when exam changes
     setFiles([]);
     setZipBlob(null);
-  }, []);
+    setServicesReady(false);
+    initializeServices(examCode);
+  }, [initializeServices]);
 
+  // Initialize services on first load
+  React.useEffect(() => {
+    initializeServices(selectedExam);
+  }, [initializeServices, selectedExam]);
   const handleFilesChange = useCallback((newFiles: ProcessedFile[]) => {
     setFiles(newFiles);
     setZipBlob(null); // Clear previous zip when files change
   }, []);
 
   const processDocuments = async () => {
-    if (files.length === 0) return;
+    if (files.length === 0 || !servicesReady) return;
 
     setIsProcessing(true);
     setZipBlob(null);
@@ -99,9 +126,16 @@ function App() {
     URL.revokeObjectURL(url);
   };
 
-  const canProcess = files.length > 0 && !isProcessing;
+  const canProcess = files.length > 0 && !isProcessing && servicesReady;
   const canDownload = zipBlob !== null && files.some(f => f.status === 'completed');
 
+  if (isInitializing) {
+    return (
+      <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 flex items-center justify-center">
+        <LoadingSpinner message="Initializing WebAssembly modules..." />
+      </div>
+    );
+  }
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100">
       {/* Header */}
@@ -115,6 +149,15 @@ function App() {
           <p className="text-xl text-gray-600 text-center mt-2">
             AI-Powered Document Converter for Competitive Exams
           </p>
+          <div className="text-center mt-2">
+            <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-medium ${
+              servicesReady 
+                ? 'bg-green-100 text-green-800' 
+                : 'bg-yellow-100 text-yellow-800'
+            }`}>
+              {servicesReady ? '✓ WebAssembly Ready' : '⏳ Loading WebAssembly...'}
+            </span>
+          </div>
         </div>
       </div>
 
@@ -126,6 +169,7 @@ function App() {
               <ExamSelector 
                 selectedExam={selectedExam} 
                 onExamChange={handleExamChange} 
+                disabled={isInitializing || isProcessing}
               />
               
               {/* Exam Info */}
@@ -152,7 +196,8 @@ function App() {
                 onFilesChange={handleFilesChange}
                 maxFileSize={examConfig.maxFileSize}
                 allowedFormats={examConfig.allowedFormats}
-                isProcessing={isProcessing}
+                isProcessing={isProcessing || isInitializing}
+                disabled={!servicesReady}
               />
             </div>
 
@@ -170,6 +215,11 @@ function App() {
                 >
                   {isProcessing ? "Processing..." : `Convert ${files.length} Files`}
                 </button>
+                {!servicesReady && (
+                  <p className="text-sm text-gray-500 mt-2">
+                    Please wait for WebAssembly modules to load...
+                  </p>
+                )}
               </div>
             )}
 

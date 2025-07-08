@@ -2,18 +2,42 @@ import { ProcessedFile } from '../types';
 
 export class DocumentAnalyzerService {
   private worker: Worker | null = null;
+  private isInitialized = false;
 
   async initialize(): Promise<void> {
-    if (!this.worker) {
+    if (!this.worker && !this.isInitialized) {
       this.worker = new Worker(
         new URL('../workers/pyodideWorker.ts', import.meta.url),
         { type: 'module' }
       );
+      
+      // Wait for worker to be ready
+      await new Promise<void>((resolve, reject) => {
+        const timeout = setTimeout(() => {
+          reject(new Error('Worker initialization timeout'));
+        }, 30000);
+
+        this.worker!.onmessage = (e) => {
+          if (e.data.type === 'ready') {
+            clearTimeout(timeout);
+            this.isInitialized = true;
+            resolve();
+          }
+        };
+
+        this.worker!.onerror = (error) => {
+          clearTimeout(timeout);
+          reject(error);
+        };
+
+        // Send initialization message
+        this.worker!.postMessage({ type: 'init' });
+      });
     }
   }
 
   async analyzeDocuments(files: ProcessedFile[], examCode: string): Promise<ProcessedFile[]> {
-    if (!this.worker) {
+    if (!this.worker || !this.isInitialized) {
       await this.initialize();
     }
 
@@ -41,7 +65,7 @@ export class DocumentAnalyzerService {
                 ...file,
                 detectedType: result.detectedType,
                 newName: result.newName,
-                status: 'completed' as const
+                status: 'processing' as const
               };
             }
             return file;
@@ -69,6 +93,7 @@ export class DocumentAnalyzerService {
     if (this.worker) {
       this.worker.terminate();
       this.worker = null;
+      this.isInitialized = false;
     }
   }
 }
