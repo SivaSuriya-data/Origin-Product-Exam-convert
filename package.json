@@ -11,6 +11,8 @@
     "build:wasm": "wasm-pack build --target web --out-dir pkg rust-formatter",
     "build:python": "python scripts/build_python_wasm.py",
     "build:all": "npm run build:wasm && npm run build:python && npm run build",
+    "setup": "chmod +x setup.sh && ./setup.sh",
+    "clean": "rm -rf node_modules rust-formatter/pkg dist && npm install",
     "generate-pdf": "node scripts/generate-pdf.js",
     "docs:pdf": "npm run generate-pdf"
   },
