@@ -18,6 +18,8 @@ self.onmessage = async function(e: MessageEvent<PyodideWorkerMessage>) {
     if (!pyodide) {
       await initializePyodide();
     }
+  }
+}
 import re
 
 class DocumentAnalyzer:
